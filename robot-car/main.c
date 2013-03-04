@@ -63,10 +63,10 @@
 #define SONAR_4_TRIG	GPIO_PIN_4
 #define SONAR_4_ECHO	GPIO_PIN_6
 
-#define SONAR_5_TRIG_PORT GPIO_PORTA_BASE
-#define SONAR_5_ECHO_PORT GPIO_PORTD_BASE
-#define SONAR_5_TRIG	GPIO_PIN_3
-#define SONAR_5_ECHO	GPIO_PIN_7
+#define SONAR_5_TRIG_PORT GPIO_PORTB_BASE
+#define SONAR_5_ECHO_PORT GPIO_PORTE_BASE
+#define SONAR_5_TRIG	GPIO_PIN_4
+#define SONAR_5_ECHO	GPIO_PIN_1
 
 #define SONAR_6_TRIG_PORT GPIO_PORTA_BASE
 #define SONAR_6_ECHO_PORT GPIO_PORTF_BASE
@@ -152,7 +152,7 @@ void initBelt(struct sonar_belt * belt, unsigned char nbRangers) {
 	belt->nb = nbRangers;
 	belt->curent_measure = 0;
 	for (i = 0; i < belt->nb; i++) {
-		belt->ranger[i].lastDistance = 10;
+		belt->ranger[i].lastDistance = -1;
 	}
 }
 
@@ -206,6 +206,8 @@ int main(void) {
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
 	for (i = 0; i < ranger_belt.nb; i++) {
 		GPIOPinTypeGPIOOutput(ranger_belt.ranger[i].trigPort,
 				ranger_belt.ranger[i].trigPin);
