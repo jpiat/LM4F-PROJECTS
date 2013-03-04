@@ -41,20 +41,38 @@
 #include "driverlib/timer.h"
 #include "utils/uartstdio.h"
 #include "driverlib/uart.h"
+#include "driverlib/fpu.h"
 
-#define SYSCTL_SONAR_PORT	SYSCTL_PERIPH_GPIOF
-#define BASE_SONAR_PORT		GPIO_PORTF_BASE
-#define SONAR_1_TRIG	GPIO_PIN_1
-#define SONAR_1_ECHO	GPIO_PIN_2
-#define SONAR_2_TRIG	GPIO_PIN_3
-#define SONAR_2_ECHO	GPIO_PIN_4
+#define SONAR_1_TRIG_PORT GPIO_PORTA_BASE
+#define SONAR_1_ECHO_PORT GPIO_PORTF_BASE
+#define SONAR_1_TRIG	GPIO_PIN_7
+#define SONAR_1_ECHO	GPIO_PIN_1
+
+#define SONAR_2_TRIG_PORT GPIO_PORTA_BASE
+#define SONAR_2_ECHO_PORT GPIO_PORTE_BASE
+#define SONAR_2_TRIG	GPIO_PIN_6
+#define SONAR_2_ECHO	GPIO_PIN_3
+
+#define SONAR_3_TRIG_PORT GPIO_PORTA_BASE
+#define SONAR_3_ECHO_PORT GPIO_PORTE_BASE
 #define SONAR_3_TRIG	GPIO_PIN_5
-#define SONAR_3_ECHO	GPIO_PIN_6
-#define SONAR_GPIO_OUTS (SONAR_1_TRIG | SONAR_2_TRIG)
-#define SONAR_GPIO_INS  (SONAR_1_ECHO | SONAR_2_ECHO)
+#define SONAR_3_ECHO	GPIO_PIN_2
 
-#define SYSCTL_SERVO_PORT	SYSCTL_PERIPH_GPIOC
-#define BASE_SERVO_PORT		GPIO_PORTC_BASE
+#define SONAR_4_TRIG_PORT GPIO_PORTA_BASE
+#define SONAR_4_ECHO_PORT GPIO_PORTD_BASE
+#define SONAR_4_TRIG	GPIO_PIN_4
+#define SONAR_4_ECHO	GPIO_PIN_6
+
+#define SONAR_5_TRIG_PORT GPIO_PORTA_BASE
+#define SONAR_5_ECHO_PORT GPIO_PORTD_BASE
+#define SONAR_5_TRIG	GPIO_PIN_3
+#define SONAR_5_ECHO	GPIO_PIN_7
+
+#define SONAR_6_TRIG_PORT GPIO_PORTA_BASE
+#define SONAR_6_ECHO_PORT GPIO_PORTF_BASE
+#define SONAR_6_TRIG	GPIO_PIN_2
+#define SONAR_6_ECHO	GPIO_PIN_4
+
 #define SERVO_1_PIN 	GPIO_PIN_1
 #define SERVO_2_PIN 	GPIO_PIN_2
 #define SERVO_GPIO_OUTS (SERVO_1_PIN | SERVO_2_PIN)
@@ -70,7 +88,9 @@ unsigned char sonarFirstEdge = 0, pulseGen = 0;
 unsigned long int sonarTemp = 0;
 
 struct sonar_ranger {
+	unsigned long trigPort;
 	unsigned long trigPin;
+	unsigned long echoPort;
 	unsigned long echoPin;
 	float lastDistance;
 };
@@ -82,6 +102,7 @@ struct sonar_belt {
 };
 
 struct servo {
+	unsigned long port;
 	unsigned long pin;
 	unsigned long pulseWidth;
 };
@@ -137,34 +158,70 @@ void initBelt(struct sonar_belt * belt, unsigned char nbRangers) {
 
 // main function.
 int main(void) {
-	unsigned int i=0, k=0;
-
+	unsigned int i = 0, k = 0;
+	FPULazyStackingEnable();
+	FPUEnable();
 	SysCtlClockSet(
 			SYSCTL_SYSDIV_2_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN
 					| SYSCTL_XTAL_16MHZ); //80Mhz
 
-	initBelt(&ranger_belt, 2);
+	initBelt(&ranger_belt, 6);
+
+	ranger_belt.ranger[0].trigPort = SONAR_1_TRIG_PORT;
+	ranger_belt.ranger[0].echoPort = SONAR_1_ECHO_PORT;
 	ranger_belt.ranger[0].echoPin = SONAR_1_ECHO;
-	ranger_belt.ranger[1].echoPin = SONAR_2_ECHO;
 	ranger_belt.ranger[0].trigPin = SONAR_1_TRIG;
+
+	ranger_belt.ranger[1].trigPort = SONAR_2_TRIG_PORT;
+	ranger_belt.ranger[1].echoPort = SONAR_2_ECHO_PORT;
+	ranger_belt.ranger[1].echoPin = SONAR_2_ECHO;
 	ranger_belt.ranger[1].trigPin = SONAR_2_TRIG;
 
-	initServos(&servos, 2);
-	servos.servos[0].pin = SERVO_1_PIN;
-	servos.servos[1].pin = SERVO_2_PIN;
+	ranger_belt.ranger[2].trigPort = SONAR_3_TRIG_PORT;
+	ranger_belt.ranger[2].echoPort = SONAR_3_ECHO_PORT;
+	ranger_belt.ranger[2].echoPin = SONAR_3_ECHO;
+	ranger_belt.ranger[2].trigPin = SONAR_3_TRIG;
+
+	ranger_belt.ranger[3].trigPort = SONAR_4_TRIG_PORT;
+	ranger_belt.ranger[3].echoPort = SONAR_4_ECHO_PORT;
+	ranger_belt.ranger[3].echoPin = SONAR_4_ECHO;
+	ranger_belt.ranger[3].trigPin = SONAR_4_TRIG;
+
+	ranger_belt.ranger[4].trigPort = SONAR_5_TRIG_PORT;
+	ranger_belt.ranger[4].echoPort = SONAR_5_ECHO_PORT;
+	ranger_belt.ranger[4].echoPin = SONAR_5_ECHO;
+	ranger_belt.ranger[4].trigPin = SONAR_5_TRIG;
+
+	ranger_belt.ranger[5].trigPort = SONAR_6_TRIG_PORT;
+	ranger_belt.ranger[5].echoPort = SONAR_6_ECHO_PORT;
+	ranger_belt.ranger[5].echoPin = SONAR_6_ECHO;
+	ranger_belt.ranger[5].trigPin = SONAR_6_TRIG;
+
+	/*initServos(&servos, 2);
+	 servos.servos[0].pin = SERVO_1_PIN;
+	 servos.servos[1].pin = SERVO_2_PIN;*/
 
 	//GPIO_CONFIG: must config each sonar ranger port as gpio interrupt on BOTH_EDGE
-	SysCtlPeripheralEnable(SYSCTL_SONAR_PORT);
-	GPIOPinTypeGPIOOutput(BASE_SONAR_PORT, SONAR_GPIO_OUTS);
-	GPIOPinWrite(BASE_SONAR_PORT, SONAR_GPIO_OUTS, 0); //clear all sonar pins
-	GPIOPinTypeGPIOInput(BASE_SONAR_PORT, SONAR_GPIO_INS);
-	GPIOIntTypeSet(BASE_SONAR_PORT, SONAR_GPIO_INS, GPIO_BOTH_EDGES);
-	GPIOPortIntRegister(BASE_SONAR_PORT, GPIO_Sonar_ISR);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA); // sonar connected ports
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+	for (i = 0; i < ranger_belt.nb; i++) {
+		GPIOPinTypeGPIOOutput(ranger_belt.ranger[i].trigPort,
+				ranger_belt.ranger[i].trigPin);
+		GPIOPinWrite(ranger_belt.ranger[i].trigPort,
+				ranger_belt.ranger[i].trigPin, 0); //clear all sonar pins
+		GPIOPinTypeGPIOInput(ranger_belt.ranger[i].echoPort,
+				ranger_belt.ranger[i].echoPin);
+		GPIOIntTypeSet(ranger_belt.ranger[i].echoPort,
+				ranger_belt.ranger[i].echoPin, GPIO_BOTH_EDGES);
+		GPIOPortIntRegister(ranger_belt.ranger[i].echoPort, GPIO_Sonar_ISR);
+	}
 
 	//configuring servo pins as out
-	SysCtlPeripheralEnable(SYSCTL_SERVO_PORT);
-	GPIOPinTypeGPIOOutput(BASE_SERVO_PORT, SERVO_GPIO_OUTS);
-	GPIOPinWrite(BASE_SERVO_PORT, SERVO_GPIO_OUTS, 0); //clear all servo pins
+	/*SysCtlPeripheralEnable(SYSCTL_SERVO_PORT);
+	 GPIOPinTypeGPIOOutput(BASE_SERVO_PORT, SERVO_GPIO_OUTS);
+	 GPIOPinWrite(BASE_SERVO_PORT, SERVO_GPIO_OUTS, 0); //clear all servo pins*/
 
 	//TIMER1_A_CONFIG : used for sonar pulses
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
@@ -176,16 +233,20 @@ int main(void) {
 	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 
 	//TIME1_B_CONFIG : used for servo pulses
-	TimerPrescaleSet(TIMER1_BASE, TIMER_B, 80); // set time prescaler to generate ~1us count
-	TimerControlStall(TIMER1_BASE, TIMER_B, true);
-	TimerLoadSet(TIMER1_BASE, TIMER_B, 20000UL); //first pulse generation
-	TimerIntRegister(TIMER1_BASE, TIMER_B, Timer1B_ISR);
-	TimerIntEnable(TIMER1_BASE, TIMER_TIMB_TIMEOUT);
+	/*TimerPrescaleSet(TIMER1_BASE, TIMER_B, 80); // set time prescaler to generate ~1us count
+	 TimerControlStall(TIMER1_BASE, TIMER_B, true);
+	 TimerLoadSet(TIMER1_BASE, TIMER_B, 20000UL); //first pulse generation
+	 TimerIntRegister(TIMER1_BASE, TIMER_B, Timer1B_ISR);
+	 TimerIntEnable(TIMER1_BASE, TIMER_TIMB_TIMEOUT);*/
 
+	while (GPIOPinRead(ranger_belt.ranger[0].echoPort,
+			ranger_belt.ranger[0].echoPin))
+		;
 	//generate first pulse to initiate measuring cycle
 	pulseGen = 0;
 	sonarFirstEdge = 1;
-	GPIOPinWrite(BASE_SONAR_PORT, SONAR_1_TRIG, SONAR_1_TRIG); //set trig
+	GPIOPinWrite(ranger_belt.ranger[0].trigPort, ranger_belt.ranger[0].trigPin,
+			ranger_belt.ranger[0].trigPin); //set trig
 	TimerEnable(TIMER1_BASE, TIMER_A);
 
 	//
@@ -207,7 +268,8 @@ int main(void) {
 		if (ranger_belt.curent_measure == 0 && k != pulseGen && pulseGen == 0) { // on falling edge of pulseGen
 			UARTprintf("[ ");
 			for (i = 0; i < ranger_belt.nb; i++) {
-				UARTprintf("%f", ranger_belt.ranger[i].lastDistance);
+				UARTprintf("%d",
+						((unsigned int) ranger_belt.ranger[i].lastDistance));
 				if (i != (ranger_belt.nb - 1)) {
 					UARTprintf(", ");
 				} else {
@@ -217,25 +279,28 @@ int main(void) {
 			UARTprintf("]\r\n");
 
 		}
-		k = pulseGen ;
+		k = pulseGen;
 	}
 }
 
 //the GPIO interrupt handler
 void GPIO_Sonar_ISR(void) {
-	GPIOPinIntClear(BASE_SONAR_PORT, SONAR_GPIO_INS);
+	GPIOPinIntClear(ranger_belt.ranger[ranger_belt.curent_measure].echoPort,
+			ranger_belt.ranger[ranger_belt.curent_measure].echoPin);
 	//should be generated first on rising edge then falling edge
-	unsigned long int valPins = GPIOPinRead(BASE_SONAR_PORT,
+	unsigned long int valPins = GPIOPinRead(
+			ranger_belt.ranger[ranger_belt.curent_measure].echoPort,
 			ranger_belt.ranger[ranger_belt.curent_measure].echoPin); // check pin state
 	if (sonarFirstEdge && valPins) { //rising edge on pin
 		sonarTemp = TimerValueGet(TIMER1_BASE, TIMER_A);
 		sonarFirstEdge = 0;
-	} else if (!valPins) { // falling edge
+	} else if (!valPins && !sonarFirstEdge) { // falling edge
 		unsigned short int timerVal = TimerValueGet(TIMER1_BASE, TIMER_A);
-		timerVal = timerVal - sonarTemp;
+		timerVal = sonarTemp - timerVal;
 		ranger_belt.ranger[ranger_belt.curent_measure].lastDistance =
-				((float) timerVal) / 58;
-		GPIOPinIntDisable(BASE_SONAR_PORT,
+				(((float) timerVal) / 58.0);
+		GPIOPinIntDisable(
+				ranger_belt.ranger[ranger_belt.curent_measure].echoPort,
 				ranger_belt.ranger[ranger_belt.curent_measure].echoPin);
 	}
 }
@@ -250,23 +315,29 @@ void Timer1A_ISR(void) {
 		struct sonar_ranger currRanger =
 				ranger_belt.ranger[ranger_belt.curent_measure];
 		TimerLoadSet(TIMER1_BASE, TIMER_A, 15);
-		GPIOPinWrite(BASE_SONAR_PORT, currRanger.trigPin, currRanger.trigPin); //set trig
+		GPIOPinIntDisable(
+				ranger_belt.ranger[ranger_belt.curent_measure].echoPort,
+				ranger_belt.ranger[ranger_belt.curent_measure].echoPin);
+		GPIOPinWrite(ranger_belt.ranger[ranger_belt.curent_measure].trigPort,
+				currRanger.trigPin, currRanger.trigPin); //set trig
 		pulseGen = 0;
 	} else {
-		GPIOPinWrite(BASE_SONAR_PORT,
+		GPIOPinWrite(ranger_belt.ranger[ranger_belt.curent_measure].trigPort,
 				ranger_belt.ranger[ranger_belt.curent_measure].trigPin, 0); //clear trig
-		GPIOPinIntEnable(BASE_SONAR_PORT,
+		GPIOPinIntEnable(
+				ranger_belt.ranger[ranger_belt.curent_measure].echoPort,
 				ranger_belt.ranger[ranger_belt.curent_measure].echoPin);
+		TimerLoadSet(TIMER1_BASE, TIMER_A, 35000UL); // timer resolution is 1µs, counting 64ms
 		sonarFirstEdge = 1;
 		pulseGen = 1;
-		TimerLoadSet(TIMER1_BASE, TIMER_A, 0xFFFF); // timer resolution is 1µs, counting 64ms
 	}
 	TimerEnable(TIMER1_BASE, TIMER_A);
 }
 
 void Timer1B_ISR(void) {
 	TimerIntClear(TIMER1_BASE, TIMER_TIMB_TIMEOUT);
-	GPIOPinWrite(BASE_SERVO_PORT, servos.servos[servos.curr].pin, 0);
+	GPIOPinWrite(servos.servos[servos.curr].port,
+			servos.servos[servos.curr].pin, 0);
 	if (servos.remains != 20000UL) { //not a initial count ...
 		servos.curr++;
 	}
@@ -278,8 +349,8 @@ void Timer1B_ISR(void) {
 		TimerLoadSet(TIMER1_BASE, TIMER_B,
 				servos.servos[servos.curr].pulseWidth);
 		servos.remains -= servos.servos[servos.curr].pulseWidth;
-		GPIOPinWrite(BASE_SERVO_PORT, servos.servos[servos.curr].pin,
-				servos.servos[servos.curr].pin);
+		GPIOPinWrite(servos.servos[servos.curr].port,
+				servos.servos[servos.curr].pin, servos.servos[servos.curr].pin);
 	}
 	TimerEnable(TIMER1_BASE, TIMER_B);
 }
