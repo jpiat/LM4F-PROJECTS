@@ -11,7 +11,8 @@ main.d: ../main.c \
  /home/jpiat/development/ARM/CORTEX-M4/stellarisware/driverlib/timer.h \
  /home/jpiat/development/ARM/CORTEX-M4/stellarisware/utils/uartstdio.h \
  /home/jpiat/development/ARM/CORTEX-M4/stellarisware/driverlib/uart.h \
- /home/jpiat/development/ARM/CORTEX-M4/stellarisware/driverlib/fpu.h
+ /home/jpiat/development/ARM/CORTEX-M4/stellarisware/driverlib/fpu.h \
+ ../sonar-belt.h ../servos.h
 
 /home/jpiat/development/ARM/CORTEX-M4/stellarisware/inc/hw_ints.h:
 
@@ -38,3 +39,7 @@ main.d: ../main.c \
 /home/jpiat/development/ARM/CORTEX-M4/stellarisware/driverlib/uart.h:
 
 /home/jpiat/development/ARM/CORTEX-M4/stellarisware/driverlib/fpu.h:
+
+../sonar-belt.h:
+
+../servos.h:

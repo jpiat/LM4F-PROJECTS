@@ -43,47 +43,9 @@
 #include "driverlib/uart.h"
 #include "driverlib/fpu.h"
 
-#define SONAR_1_TRIG_PORT GPIO_PORTA_BASE
-#define SONAR_1_ECHO_PORT GPIO_PORTF_BASE
-#define SONAR_1_TRIG	GPIO_PIN_7
-#define SONAR_1_ECHO	GPIO_PIN_1
+#include "sonar-belt.h"
+#include "servos.h"
 
-#define SONAR_2_TRIG_PORT GPIO_PORTA_BASE
-#define SONAR_2_ECHO_PORT GPIO_PORTE_BASE
-#define SONAR_2_TRIG	GPIO_PIN_6
-#define SONAR_2_ECHO	GPIO_PIN_3
-
-#define SONAR_3_TRIG_PORT GPIO_PORTA_BASE
-#define SONAR_3_ECHO_PORT GPIO_PORTE_BASE
-#define SONAR_3_TRIG	GPIO_PIN_5
-#define SONAR_3_ECHO	GPIO_PIN_2
-
-#define SONAR_4_TRIG_PORT GPIO_PORTB_BASE
-#define SONAR_4_ECHO_PORT GPIO_PORTE_BASE
-#define SONAR_4_TRIG	GPIO_PIN_4
-#define SONAR_4_ECHO	GPIO_PIN_1
-
-#define SONAR_5_TRIG_PORT GPIO_PORTE_BASE
-#define SONAR_5_ECHO_PORT GPIO_PORTD_BASE
-#define SONAR_5_TRIG	GPIO_PIN_5
-#define SONAR_5_ECHO	GPIO_PIN_3
-
-#define SONAR_6_TRIG_PORT GPIO_PORTE_BASE
-#define SONAR_6_ECHO_PORT GPIO_PORTD_BASE
-#define SONAR_6_TRIG	GPIO_PIN_4
-#define SONAR_6_ECHO	GPIO_PIN_2
-
-#define SERVO_1_PORT	GPIO_PORTA_BASE
-#define SERVO_2_PORT	GPIO_PORTA_BASE
-#define SERVO_1_PIN 	GPIO_PIN_3
-#define SERVO_2_PIN 	GPIO_PIN_2
-#define SERVO_MAX	90.0
-#define SERVO_MIN	-90.0
-#define SERVO_MAX_PULSE 2000UL
-#define SERVO_MIN_PULSE	 1000UL
-#define SERVO_PULSE_RANGE (SERVO_MAX_PULSE - SERVO_MIN_PULSE)
-#define SERVO_QUANTA		(SERVO_PULSE_RANGE/(SERVO_MAX - SERVO_MIN))
-#define SERVO_CENTER	1500UL
 
 #define LED_PORT GPIO_PORTF_BASE
 #define LED_R	GPIO_PIN_1
@@ -97,34 +59,6 @@
 unsigned char sonarFirstEdge = 0, pulseGen = 0;
 unsigned long int sonarTemp = 0;
 
-struct sonar_ranger {
-	unsigned long trigPort;
-	unsigned long trigPin;
-	unsigned long echoPort;
-	unsigned long echoPin;
-	float heading;
-	float cone;
-	float lastDistance;
-};
-
-struct sonar_belt {
-	unsigned char nb;
-	unsigned char curent_measure;
-	struct sonar_ranger ranger[8];
-};
-
-struct servo {
-	unsigned long port;
-	unsigned long pin;
-	unsigned long pulseWidth;
-};
-
-struct servo_array {
-	unsigned char nb; //must be less than 8
-	unsigned char curr;
-	unsigned long int remains;
-	struct servo servos[8];
-};
 
 struct sonar_belt ranger_belt;
 struct servo_array servos;
@@ -133,40 +67,6 @@ struct servo_array servos;
 void Timer1A_ISR(void);
 void Timer1B_ISR(void);
 void GPIO_Sonar_ISR(void);
-void initServos(struct servo_array * servosp, unsigned char nbServos);
-void initBelt(struct sonar_belt * belt, unsigned char nbRangers);
-
-// angle between -90 and 90
-void setServoAngle(struct servo * servop, float angle) {
-	unsigned long int pulse = 0;
-	if (angle > SERVO_MAX) {
-		servop->pulseWidth = SERVO_MAX_PULSE;
-	} else if (angle < SERVO_MIN) {
-		servop->pulseWidth = SERVO_MIN_PULSE;
-	} else {
-		pulse = angle - SERVO_MIN;
-		pulse = pulse * SERVO_QUANTA;
-		servop->pulseWidth = SERVO_MIN_PULSE + pulse;
-	}
-}
-
-void initServos(struct servo_array * servosp, unsigned char nbServos) {
-	unsigned int i;
-	servosp->nb = nbServos;
-	servosp->curr = 0;
-	for (i = 0; i < servosp->nb; i++) {
-		servosp->servos[i].pulseWidth = SERVO_CENTER; //center pos on all servos
-	}
-}
-
-void initBelt(struct sonar_belt * belt, unsigned char nbRangers) {
-	unsigned int i;
-	belt->nb = nbRangers;
-	belt->curent_measure = 0;
-	for (i = 0; i < belt->nb; i++) {
-		belt->ranger[i].lastDistance = -1;
-	}
-}
 
 // main function.
 int main(void) {
@@ -307,9 +207,8 @@ int main(void) {
 	while (GPIOPinRead(SW_PORT, SW2))
 		;
 	while (1) {
-
 		k = -1;
-		rangeMin = 400.0;
+		rangeMin = 200.0;
 		for (i = 0; i < ranger_belt.nb; i++) {
 			if (ranger_belt.ranger[i].lastDistance < 20.0
 					&& ranger_belt.ranger[i].lastDistance < rangeMin) {
@@ -317,7 +216,13 @@ int main(void) {
 			}
 		}
 		if (k > 0) {
-			setServoAngle(&servos.servos[0], ranger_belt.ranger[k].heading);
+			//really arguable obstacle avoidance method
+			//should rely on heading order
+			if(ranger_belt.ranger[k].heading < 0){
+				setServoAngle(&servos.servos[0], ranger_belt.ranger[k].heading + 90);
+			}else{
+				setServoAngle(&servos.servos[0], ranger_belt.ranger[k].heading - 90);
+			}
 			GPIOPinWrite(LED_PORT, LED_G, 0);
 		} else {
 			GPIOPinWrite(LED_PORT, LED_G, LED_G);
